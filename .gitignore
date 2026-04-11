@@ -1,0 +1,9 @@
+en.openfoodfacts.org.products.tsv
+__pycache__/
+*.pyc
+venv/
+.venv/
+uploads/
+nutrition_ai_model.pkl
+*.log
+.env
