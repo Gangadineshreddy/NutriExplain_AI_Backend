@@ -4,6 +4,5 @@ __pycache__/
 venv/
 .venv/
 uploads/
-nutrition_ai_model.pkl
 *.log
 .env
