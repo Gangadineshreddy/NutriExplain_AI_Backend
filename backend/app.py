@@ -6,6 +6,10 @@ from flask_cors import CORS
 import pandas as pd
 import numpy as np
 import joblib
+import smtplib
+import random
+from email.mime.text import MIMEText
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app)
@@ -64,27 +68,107 @@ def register_user():
 
 
 # -------------------------
-# RESET PASSWORD
+# OTP & RESET PASSWORD
 # -------------------------
-@app.route("/reset-password", methods=["POST"])
-def reset_password():
+@app.route("/send-otp", methods=["POST"])
+def send_otp():
     data = request.json
-    email = data["email"]
-    new_password = data["new_password"]
+    email = data.get("email")
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
 
     conn = get_db_connection()
     cursor = conn.cursor()
-
     try:
         # Check if user exists
         cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
-        user = cursor.fetchone()
-        if not user:
+        if not cursor.fetchone():
             return jsonify({"error": "No account found with this email"}), 404
+
+        # Generate OTP
+        otp = str(random.randint(100000, 999999))
+        expires_at = datetime.now() + timedelta(minutes=10)
+
+        # Store OTP
+        cursor.execute("DELETE FROM password_resets WHERE email=%s", (email,))
+        cursor.execute("INSERT INTO password_resets (email, otp, expires_at) VALUES (%s, %s, %s)", (email, otp, expires_at))
+        conn.commit()
+
+        # Send email
+        SENDER_EMAIL = "mandlidinesh1432@gmail.com"
+        SENDER_PASSWORD = "jilucoczqehkqzcm"
+        
+        print(f"\n======================================")
+        print(f"MOCK EMAIL TO: {email}")
+        print(f"OTP CODE: {otp}")
+        print(f"======================================\n")
+
+        if SENDER_EMAIL and SENDER_PASSWORD:
+            msg = MIMEText(f"Your password reset code is: {otp}\nIt expires in 10 minutes.")
+            msg['Subject'] = 'NutriExplain Password Reset'
+            msg['From'] = SENDER_EMAIL
+            msg['To'] = email
+
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+                server.login(SENDER_EMAIL, SENDER_PASSWORD)
+                server.send_message(msg)
+
+        return jsonify({"message": "OTP sent successfully"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.route("/verify-otp", methods=["POST"])
+def verify_otp():
+    data = request.json
+    email = data.get("email")
+    otp = data.get("otp")
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM password_resets WHERE email=%s AND otp=%s", (email, otp))
+        record = cursor.fetchone()
+
+        if not record:
+            return jsonify({"error": "Invalid OTP"}), 400
+        
+        if datetime.now() > record["expires_at"]:
+            return jsonify({"error": "OTP has expired"}), 400
+
+        return jsonify({"message": "OTP verified successfully"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.route("/reset-password", methods=["POST"])
+def reset_password():
+    data = request.json
+    email = data.get("email")
+    otp = data.get("otp")
+    new_password = data.get("new_password")
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        # Double check OTP just in case
+        cursor.execute("SELECT * FROM password_resets WHERE email=%s AND otp=%s", (email, otp))
+        record = cursor.fetchone()
+
+        if not record or datetime.now() > record["expires_at"]:
+            return jsonify({"error": "Invalid or expired OTP"}), 400
             
         # Update password
         cursor.execute("UPDATE users SET password_hash=%s WHERE email=%s", (new_password, email))
+        # Clear the OTP
+        cursor.execute("DELETE FROM password_resets WHERE email=%s", (email,))
         conn.commit()
+        
         return jsonify({"message": "Password reset successfully"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -178,6 +262,17 @@ def ensure_schema():
         if not cursor.fetchone():
             cursor.execute("ALTER TABLE scan_history ADD COLUMN image_url VARCHAR(255) DEFAULT NULL")
             conn.commit()
+            
+        # Add password_resets table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            email VARCHAR(255) NOT NULL,
+            otp VARCHAR(6) NOT NULL,
+            expires_at DATETIME NOT NULL
+        )
+        """)
+        conn.commit()
     except:
         pass
     finally:
@@ -567,8 +662,9 @@ def get_history():
 # -------------------------
 def get_from_openfoodfacts_api(barcode):
     try:
-        url = f"https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
-        response = requests.get(url, timeout=10)
+        url = f"https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
+        headers = {"User-Agent": "NutriAI-App/1.0"}
+        response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             data = response.json()
             if data.get("status") == 1:
@@ -705,6 +801,12 @@ def get_product_data():
                             carbs_idx = header.index("carbohydrates_100g")
                             protein_idx = header.index("proteins_100g")
                             fiber_idx = header.index("fiber_100g")
+                            
+                            kcal_idx = header.index("energy-kcal_100g") if "energy-kcal_100g" in header else -1
+                            kj_idx = header.index("energy-kj_100g") if "energy-kj_100g" in header else -1
+                            name_idx = header.index("product_name") if "product_name" in header else -1
+                            img_idx = header.index("image_url") if "image_url" in header else -1
+                            
                             # Calorie logic with macro fallback
                             sugar_val = gv(sugar_idx)
                             fat_val = gv(fat_idx)
