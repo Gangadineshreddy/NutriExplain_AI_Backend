@@ -20,17 +20,16 @@ import Result from './pages/Scan/Result';
 import EditProfile from './pages/Dashboard/EditProfile';
 
 // Layout
-import BottomNav from './components/BottomNav';
+import DesktopLayout from './components/DesktopLayout';
 
 const ProtectedRoute = ({ children }) => {
   const { userId, loading } = useAuth();
   if (loading) return <div className="loader" style={{margin: 'auto', marginTop: '50vh'}}></div>;
   if (!userId) return <Navigate to="/login" />;
   return (
-    <>
+    <DesktopLayout>
       {children}
-      <BottomNav />
-    </>
+    </DesktopLayout>
   );
 };
 

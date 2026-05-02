@@ -33,8 +33,8 @@ const Login = () => {
   };
 
   return (
-    <div className="screen-padding flex-center animate-fade-in">
-      <div className="glass-panel w-full">
+    <div className="screen-padding flex-center animate-fade-in" style={{ height: '100%' }}>
+      <div className="glass-panel auth-container w-full">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-primary mb-2">Welcome Back</h1>
           <p className="text-muted">Sign in to continue your health journey</p>

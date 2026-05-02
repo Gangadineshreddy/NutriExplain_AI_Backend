@@ -41,29 +41,29 @@ const History = () => {
           <p>No scan history found</p>
         </div>
       ) : (
-        <div className="flex-column gap-4">
+        <div className="history-grid">
           {history.map((item, i) => (
-            <div key={i} className="glass-panel flex-between" style={{ padding: '16px' }}>
+            <div key={i} className="glass-panel flex-between" style={{ padding: '20px', transition: 'transform 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
               <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                 <div style={{ 
-                  width: '50px', 
-                  height: '50px', 
+                  width: '60px', 
+                  height: '60px', 
                   borderRadius: '12px', 
                   background: item.image_url ? `url(${item.image_url}) center/cover` : 'var(--bg-dark)',
                   border: '1px solid rgba(255,255,255,0.1)'
                 }} />
                 <div>
-                  <h3 className="font-semibold text-sm">{item.product_name}</h3>
-                  <p className="text-muted" style={{ fontSize: '12px' }}>
+                  <h3 className="font-semibold">{item.product_name}</h3>
+                  <p className="text-muted text-sm mt-1">
                     {new Date(item.scanned_at).toLocaleDateString()}
                   </p>
                 </div>
               </div>
               <div>
                 {item.analysis_result === 'SAFE' ? (
-                  <CheckCircle size={24} color="var(--primary-green)" />
+                  <CheckCircle size={28} color="var(--primary-green)" />
                 ) : (
-                  <AlertTriangle size={24} color="var(--danger)" />
+                  <AlertTriangle size={28} color="var(--danger)" />
                 )}
               </div>
             </div>
